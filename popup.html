@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PESU Slide Downloader</title>
+    <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📚 PESU Slides</h1>
+            <p class="subtitle">Mass Download Tool</p>
+        </div>
+        
+        <div class="content">
+            <button id="scanButton" class="btn btn-primary">
+                <span class="btn-icon">🔍</span>
+                Scan for Slides
+            </button>
+            
+            <div id="resultsSection" class="results-section hidden">
+                <div class="stats">
+                    <span id="slideCount" class="count">0</span>
+                    <span class="label">slides found</span>
+                </div>
+                
+                <div id="slidesList" class="slides-list"></div>
+                
+                <button id="downloadButton" class="btn btn-success">
+                    <span class="btn-icon">⬇️</span>
+                    Download All
+                </button>
+            </div>
+            
+            <div id="statusSection" class="status-section">
+                <p id="status" class="status-text"></p>
+                <div id="progressBar" class="progress-bar hidden">
+                    <div id="progressFill" class="progress-fill"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="popup.js"></script>
+</body>
+</html>
