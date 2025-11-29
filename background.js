@@ -5,7 +5,8 @@ console.log('PESU Academy Slide Downloader background service worker loaded');
 // Listen for messages from popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.type === 'downloadSlides') {
-        handleBatchDownload(request.slides, sender.tab?.id)
+        const courseName = request.courseName || 'Unknown_Course';
+        handleBatchDownload(request.slides, courseName, sender.tab?.id)
             .then(() => {
                 sendResponse({ success: true });
             })
@@ -17,7 +18,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
 });
 
-async function handleBatchDownload(slides, tabId) {
+async function handleBatchDownload(slides, courseName, tabId) {
     let downloadedCount = 0;
     const total = slides.length;
 
@@ -26,11 +27,14 @@ async function handleBatchDownload(slides, tabId) {
             // Sanitize filename to remove invalid characters
             const sanitizedName = sanitizeFilename(slide.name);
 
-            // Start download
+            // Use the folderName from the slide object, or fall back to courseName
+            const folderName = slide.folderName || courseName || 'Unknown_Course';
+
+            // Start download with unit-specific subfolder
             await new Promise((resolve, reject) => {
                 chrome.downloads.download({
                     url: slide.url,
-                    filename: `PESU_Slides/${sanitizedName}`,
+                    filename: `PESU_Slides/${folderName}/${sanitizedName}`,
                     conflictAction: 'uniquify',
                     saveAs: false
                 }, (downloadId) => {

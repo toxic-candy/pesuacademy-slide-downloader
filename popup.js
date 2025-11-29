@@ -9,6 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const progressFill = document.getElementById('progressFill');
 
     let foundSlides = [];
+    let courseName = 'Unknown_Course';
 
     scanButton.addEventListener('click', async () => {
         status.textContent = 'Auto-expanding all slides...';
@@ -27,6 +28,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 func: async () => {
                     const slides = [];
                     const processedUrls = new Set();
+                    let courseName = 'Unknown_Course'; // Local to the injected script
+                    let firstUnitFolderName = 'Unknown_Course'; // To capture the folder name for the first unit
 
                     // Step 1: Find all numbered links with title="Click here to view content"
                     // Filter to only include links from the "Slides" column
@@ -62,26 +65,141 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     console.log(`Found ${clickableLinks.length} clickable slide links to process`);
 
-                    // Step 2: For each numbered link, click it, extract slides, and navigate back
+                    // Step 2: Determine which unit each link belongs to by analyzing the table structure
+                    // Build a map of link index -> unit number
+                    const linkUnitMap = new Map();
+
+                    clickableLinks.forEach((link, index) => {
+                        // Find the row containing this link
+                        const row = link.closest('tr');
+                        if (!row) return;
+
+                        // Look backwards through previous rows to find unit header
+                        let currentRow = row.previousElementSibling;
+                        let unitNumber = null;
+
+                        while (currentRow) {
+                            const rowText = currentRow.textContent.trim();
+                            // Look for "Unit 1", "Unit 2", etc. in row text
+                            const match = rowText.match(/Unit\s+(\d+)/i);
+                            if (match) {
+                                unitNumber = match[1];
+                                break;
+                            }
+                            currentRow = currentRow.previousElementSibling;
+                        }
+
+                        // If no unit found by looking backwards, try looking at the row itself
+                        if (!unitNumber) {
+                            const rowText = row.textContent.trim();
+                            const match = rowText.match(/Unit\s+(\d+)/i);
+                            if (match) {
+                                unitNumber = match[1];
+                            }
+                        }
+
+                        linkUnitMap.set(index, unitNumber);
+                        console.log(`Link ${index} belongs to Unit ${unitNumber || 'Unknown'}`);
+                    });
+
+                    // Step 3: For each numbered link, click it, extract slides, and navigate back
                     for (let i = 0; i < clickableLinks.length; i++) {
                         try {
+                            // Get the unit number for this link from our map
+                            const unitNumber = linkUnitMap.get(i);
+
                             // Click the numbered link (this navigates to a new page/view)
                             clickableLinks[i].click();
 
                             // Wait for navigation and new content to load
                             await new Promise(resolve => setTimeout(resolve, 1500));
 
-                            // Now we're on the slide topics page - find all slide links
-                            const slideLinks = document.querySelectorAll('a[onclick*="loadIframe"]');
+                            // Extract course name from the unit page (only on first iteration)
+                            if (i === 0) {
+                                // Look for course name in links (like "UE23CS351A : Database Management System")
+                                const allLinks = document.querySelectorAll('a');
+                                for (const link of allLinks) {
+                                    const text = link.textContent.trim();
+                                    // Look for pattern like "CODE : Course Name"
+                                    if (text.includes(':') && text.length > 10 && text.length < 100 &&
+                                        !text.includes('Profile') && !text.includes('My Courses')) {
+                                        courseName = text.split(':')[1].trim(); // Take part after colon
+                                        break;
+                                    }
+                                }
+                                console.log('Extracted course name:', courseName);
+                            }
 
-                            console.log(`Found ${slideLinks.length} slide links on page ${i + 1}`);
+                            // Create folder name for this unit
+                            let folderName = courseName
+                                .replace(/[<>:"/\\|?*]/g, '_')
+                                .replace(/\s+/g, '_')
+                                .replace(/_+/g, '_')
+                                .replace(/^_|_$/g, '')
+                                .substring(0, 50);
+
+                            if (unitNumber) {
+                                folderName = `${folderName}_Unit_${unitNumber}`;
+                            }
+
+                            if (i === 0) {
+                                firstUnitFolderName = folderName; // Capture for the outer scope
+                            }
+
+                            // Check if there's a "Slides" tab and click it
+                            const slidesTab = Array.from(document.querySelectorAll('a, button, div[role="tab"]')).find(el =>
+                                el.textContent.trim().toLowerCase() === 'slides'
+                            );
+
+                            if (slidesTab) {
+                                console.log('Found Slides tab, clicking it...');
+                                slidesTab.click();
+                                await new Promise(resolve => setTimeout(resolve, 1000));
+                            }
+
+                            // Now we're on the slide topics page - find all slide links
+                            // Look for: loadIframe links, direct download links, AND downloadcoursedoc divs
+                            const allLinks = document.querySelectorAll('a');
+                            const slideLinks = Array.from(allLinks).filter(link => {
+                                const onclick = link.getAttribute('onclick');
+                                const href = link.href || '';
+
+                                // Include if has loadIframe OR is a direct download link
+                                return (onclick && onclick.includes('loadIframe')) ||
+                                    href.toLowerCase().endsWith('.pdf') ||
+                                    href.toLowerCase().endsWith('.pptx') ||
+                                    href.toLowerCase().endsWith('.ppt');
+                            });
+
+                            // Also look for div elements with downloadcoursedoc (Graph Theory style)
+                            const downloadDivs = Array.from(document.querySelectorAll('div[onclick*="downloadcoursedoc"]'));
+
+                            console.log(`Found ${slideLinks.length} slide links and ${downloadDivs.length} download divs on page ${i + 1}`);
 
                             slideLinks.forEach(slideLink => {
-                                const onclickAttr = slideLink.getAttribute('onclick');
-                                const match = onclickAttr.match(/loadIframe\s*\(\s*['"]([^'"]+)['"]/);
+                                let url = null;
+                                let name = slideLink.textContent.trim();
 
-                                if (match && match[1]) {
-                                    let url = match[1];
+                                // Try to get URL from onclick attribute first (loadIframe pattern)
+                                const onclickAttr = slideLink.getAttribute('onclick');
+                                if (onclickAttr) {
+                                    const match = onclickAttr.match(/loadIframe\s*\(\s*['"]([^'"]+)['"]/);
+                                    if (match && match[1]) {
+                                        url = match[1];
+                                    }
+                                }
+
+                                // If no onclick, try href (direct download links)
+                                if (!url && slideLink.href) {
+                                    const href = slideLink.href;
+                                    if (href.toLowerCase().endsWith('.pdf') ||
+                                        href.toLowerCase().endsWith('.pptx') ||
+                                        href.toLowerCase().endsWith('.ppt')) {
+                                        url = href;
+                                    }
+                                }
+
+                                if (url) {
 
                                     // Skip if already processed
                                     if (processedUrls.has(url)) return;
@@ -92,8 +210,10 @@ document.addEventListener('DOMContentLoaded', () => {
                                         url = new URL(url, window.location.origin).href;
                                     }
 
-                                    // Get slide name from link text
-                                    let name = slideLink.textContent.trim();
+                                    // If name is empty, try to get it from link text again
+                                    if (!name || name.length < 3) {
+                                        name = slideLink.textContent.trim();
+                                    }
 
                                     // Determine file extension from URL
                                     let extension = '';
@@ -111,10 +231,58 @@ document.addEventListener('DOMContentLoaded', () => {
                                         name = 'slide_' + (slides.length + 1) + extension;
                                     }
 
-                                    slides.push({ url, name });
+                                    slides.push({ url, name, folderName });
                                     console.log(`Found slide: ${name} -> ${url}`);
                                 }
                             });
+
+                            // Process downloadcoursedoc divs (Graph Theory style)
+                            // Extract the document IDs and store them for later download
+                            for (const downloadDiv of downloadDivs) {
+                                try {
+                                    // Extract the document ID from onclick="downloadcoursedoc('ID')"
+                                    const onclickAttr = downloadDiv.getAttribute('onclick');
+                                    const match = onclickAttr.match(/downloadcoursedoc\s*\(\s*['"]([^'"]+)['"]/);
+
+                                    if (match && match[1]) {
+                                        const docId = match[1];
+
+                                        // Construct the download URL using the actual endpoint
+                                        // The downloadcoursedoc function uses: referenceMeterials/downloadcoursedoc/ID
+                                        const url = `https://www.pesuacademy.com/Academy/s/referenceMeterials/downloadcoursedoc/${docId}`;
+
+                                        // Skip if already processed
+                                        if (processedUrls.has(url)) continue;
+                                        processedUrls.add(url);
+
+                                        // Get the name from the div's text content or nearby elements
+                                        let name = downloadDiv.textContent.trim();
+
+                                        // If name is too long or empty, try to find a better name
+                                        if (!name || name.length > 100) {
+                                            const parent = downloadDiv.closest('.content-type-area') || downloadDiv.parentElement;
+                                            const heading = parent ? parent.querySelector('h1, h2, h3, h4, h5, strong') : null;
+                                            if (heading) {
+                                                name = heading.textContent.trim();
+                                            }
+                                        }
+
+                                        // Add a generic extension if we don't know the type
+                                        if (name && !name.match(/\.(pdf|pptx|ppt)$/i)) {
+                                            name += '.pptx'; // Default to pptx for Graph Theory
+                                        }
+
+                                        if (!name) {
+                                            name = 'slide_' + (slides.length + 1) + '.pptx';
+                                        }
+
+                                        slides.push({ url, name, folderName });
+                                        console.log(`Found downloadcoursedoc slide: ${name} -> ${url}`);
+                                    }
+                                } catch (error) {
+                                    console.error('Error processing download div:', error);
+                                }
+                            }
 
                             // Navigate back to the units page
                             const backButton = document.querySelector('a:has-text("Back to Units")') ||
@@ -189,7 +357,8 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const response = await chrome.runtime.sendMessage({
                 type: 'downloadSlides',
-                slides: foundSlides
+                slides: foundSlides,
+                courseName: courseName
             });
 
             if (response && response.success) {

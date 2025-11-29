@@ -22,7 +22,7 @@ A Chrome extension to mass download slides (PDFs and PPTX files) from PESU Acade
    - Open Chrome and navigate to `chrome://extensions/`
    - Enable **Developer mode** (toggle in top-right corner)
    - Click **Load unpacked**
-   - Select the `/home/bruh/Documents/Downloader` folder
+   - Select the cloned folder
    - The extension icon should appear in your toolbar
 
 3. **Pin the Extension** (Optional)
