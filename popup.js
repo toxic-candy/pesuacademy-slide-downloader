@@ -100,6 +100,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     console.log('Current unit number:', currentUnitNumber || 'Not detected');
 
+                    // Counter for sequential numbering of slides
+                    let slideCounter = 0;
+
                     // Step 3: For each numbered link, click it, extract slides, and navigate back
                     for (let i = 0; i < clickableLinks.length; i++) {
                         try {
@@ -219,14 +222,23 @@ document.addEventListener('DOMContentLoaded', () => {
                                     else if (url.toLowerCase().includes('.pptx')) extension = '.pptx';
                                     else if (url.toLowerCase().includes('.ppt')) extension = '.ppt';
 
-                                    // Add extension if not present
-                                    if (extension && !name.toLowerCase().endsWith(extension)) {
-                                        name += extension;
+                                    // Remove extension from name if it's already there
+                                    if (extension && name.toLowerCase().endsWith(extension.toLowerCase())) {
+                                        name = name.substring(0, name.length - extension.length);
                                     }
 
-                                    // Fallback name
-                                    if (!name || name === extension) {
-                                        name = 'slide_' + (slides.length + 1) + extension;
+                                    // Fallback name if still empty
+                                    if (!name || name.trim() === '') {
+                                        name = 'slide_' + (slides.length + 1);
+                                    }
+
+                                    // Add sequential numbering to the base name
+                                    slideCounter++;
+                                    name = `${slideCounter}. ${name}`;
+
+                                    // Add extension at the end
+                                    if (extension) {
+                                        name += extension;
                                     }
 
                                     slides.push({ url, name, folderName });
@@ -265,14 +277,26 @@ document.addEventListener('DOMContentLoaded', () => {
                                             }
                                         }
 
-                                        // Add a generic extension if we don't know the type
-                                        if (name && !name.match(/\.(pdf|pptx|ppt)$/i)) {
-                                            name += '.pptx'; // Default to pptx for Graph Theory
+                                        // Determine extension (default to pptx for Graph Theory)
+                                        let extension = '.pptx';
+                                        if (name && name.match(/\.(pdf|pptx|ppt)$/i)) {
+                                            const match = name.match(/\.(pdf|pptx|ppt)$/i);
+                                            extension = match[0].toLowerCase();
+                                            // Remove extension from name
+                                            name = name.substring(0, name.length - extension.length);
                                         }
 
-                                        if (!name) {
-                                            name = 'slide_' + (slides.length + 1) + '.pptx';
+                                        // Fallback name if still empty
+                                        if (!name || name.trim() === '') {
+                                            name = 'slide_' + (slides.length + 1);
                                         }
+
+                                        // Add sequential numbering to the base name
+                                        slideCounter++;
+                                        name = `${slideCounter}. ${name}`;
+
+                                        // Add extension at the end
+                                        name += extension;
 
                                         slides.push({ url, name, folderName });
                                         console.log(`Found downloadcoursedoc slide: ${name} -> ${url}`);

@@ -75,11 +75,10 @@ async function handleBatchDownload(slides, courseName, tabId) {
 
 function sanitizeFilename(filename) {
     // Remove or replace invalid filename characters
+    // Keep spaces, periods, and other safe characters
     return filename
         .replace(/[<>:"/\\|?*]/g, '_')  // Replace invalid chars with underscore
-        .replace(/\s+/g, '_')            // Replace spaces with underscore
         .replace(/_+/g, '_')             // Replace multiple underscores with single
-        .replace(/^_|_$/g, '')           // Remove leading/trailing underscores
         .substring(0, 200);              // Limit length
 }
 
