@@ -65,48 +65,46 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     console.log(`Found ${clickableLinks.length} clickable slide links to process`);
 
-                    // Step 2: Determine which unit each link belongs to by analyzing the table structure
-                    // Build a map of link index -> unit number
-                    const linkUnitMap = new Map();
+                    // Step 2: Determine the current unit by checking for highlighted/active unit tab
+                    let currentUnitNumber = null;
 
-                    clickableLinks.forEach((link, index) => {
-                        // Find the row containing this link
-                        const row = link.closest('tr');
-                        if (!row) return;
-
-                        // Look backwards through previous rows to find unit header
-                        let currentRow = row.previousElementSibling;
-                        let unitNumber = null;
-
-                        while (currentRow) {
-                            const rowText = currentRow.textContent.trim();
-                            // Look for "Unit 1", "Unit 2", etc. in row text
-                            const match = rowText.match(/Unit\s+(\d+)/i);
+                    // Look for active unit tabs - specifically LI elements with active class
+                    const listItems = document.querySelectorAll('li.active, li.selected, li.current');
+                    for (const li of listItems) {
+                        // Check if this LI contains a link with "Unit X:" text
+                        const link = li.querySelector('a');
+                        if (link) {
+                            const text = link.textContent.trim();
+                            const match = text.match(/^Unit\s+(\d+)\s*:/i);
                             if (match) {
-                                unitNumber = match[1];
+                                currentUnitNumber = match[1];
+                                console.log('Found active unit tab (via LI):', text, '-> Unit', currentUnitNumber);
                                 break;
                             }
-                            currentRow = currentRow.previousElementSibling;
                         }
+                    }
 
-                        // If no unit found by looking backwards, try looking at the row itself
-                        if (!unitNumber) {
-                            const rowText = row.textContent.trim();
-                            const match = rowText.match(/Unit\s+(\d+)/i);
+                    // Fallback: check for A elements with active class
+                    if (!currentUnitNumber) {
+                        const links = document.querySelectorAll('a.active, a.selected, a[aria-selected="true"]');
+                        for (const link of links) {
+                            const text = link.textContent.trim();
+                            const match = text.match(/^Unit\s+(\d+)\s*:/i);
                             if (match) {
-                                unitNumber = match[1];
+                                currentUnitNumber = match[1];
+                                console.log('Found active unit tab (via A):', text, '-> Unit', currentUnitNumber);
+                                break;
                             }
                         }
+                    }
 
-                        linkUnitMap.set(index, unitNumber);
-                        console.log(`Link ${index} belongs to Unit ${unitNumber || 'Unknown'}`);
-                    });
+                    console.log('Current unit number:', currentUnitNumber || 'Not detected');
 
                     // Step 3: For each numbered link, click it, extract slides, and navigate back
                     for (let i = 0; i < clickableLinks.length; i++) {
                         try {
-                            // Get the unit number for this link from our map
-                            const unitNumber = linkUnitMap.get(i);
+                            // Use the current unit number for all slides in this scan
+                            const unitNumber = currentUnitNumber;
 
                             // Click the numbered link (this navigates to a new page/view)
                             clickableLinks[i].click();
