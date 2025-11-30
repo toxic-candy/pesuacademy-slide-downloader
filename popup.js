@@ -68,37 +68,77 @@ document.addEventListener('DOMContentLoaded', () => {
                     // Step 2: Determine the current unit by checking for highlighted/active unit tab
                     let currentUnitNumber = null;
 
-                    // Look for active unit tabs - specifically LI elements with active class
-                    const listItems = document.querySelectorAll('li.active, li.selected, li.current');
-                    for (const li of listItems) {
-                        // Check if this LI contains a link with "Unit X:" text
-                        const link = li.querySelector('a');
-                        if (link) {
-                            const text = link.textContent.trim();
-                            const match = text.match(/^Unit\s+(\d+)\s*:/i);
-                            if (match) {
+                    // Debug: Log all links with "Unit X" pattern (with or without colon)
+                    console.log('=== UNIT DETECTION DEBUG ===');
+                    const debugLinks = document.querySelectorAll('a');
+                    let unitLinksFound = [];
+                    for (const link of debugLinks) {
+                        const text = link.textContent.trim();
+                        // Match "Unit 1", "Unit 1:", "Unit 2", etc.
+                        if (text.match(/^Unit\s+(\d+)/i)) {
+                            const parentLi = link.closest('li');
+                            unitLinksFound.push({
+                                text: text.substring(0, 50),
+                                hasParentLi: !!parentLi,
+                                parentLiClasses: parentLi ? parentLi.className : 'none',
+                                linkClasses: link.className
+                            });
+                        }
+                    }
+                    console.log('Unit links found:', unitLinksFound);
+
+                    // Method 1: Check all links with "Unit X" pattern and find the one in an active parent
+                    // Match "Unit 1", "Unit 1:", "Unit 2", etc. (with or without colon)
+                    const allLinks = document.querySelectorAll('a');
+                    for (const link of allLinks) {
+                        const text = link.textContent.trim();
+                        const match = text.match(/^Unit\s+(\d+)/i);  // Removed colon requirement
+                        if (match) {
+                            // Check if link or its parent LI has active class
+                            const parentLi = link.closest('li');
+                            if (parentLi && (parentLi.classList.contains('active') ||
+                                parentLi.classList.contains('selected') ||
+                                parentLi.classList.contains('current'))) {
                                 currentUnitNumber = match[1];
-                                console.log('Found active unit tab (via LI):', text, '-> Unit', currentUnitNumber);
+                                console.log('Found active unit tab (via parent LI):', text, '-> Unit', currentUnitNumber);
                                 break;
                             }
                         }
                     }
 
-                    // Fallback: check for A elements with active class
+                    // Method 2: Check for A elements with active class directly
                     if (!currentUnitNumber) {
-                        const links = document.querySelectorAll('a.active, a.selected, a[aria-selected="true"]');
+                        const links = document.querySelectorAll('a.active, a.selected, a[aria-selected="true"], a[aria-current="page"]');
                         for (const link of links) {
                             const text = link.textContent.trim();
-                            const match = text.match(/^Unit\s+(\d+)\s*:/i);
+                            const match = text.match(/^Unit\s+(\d+)/i);  // Removed colon requirement
                             if (match) {
                                 currentUnitNumber = match[1];
-                                console.log('Found active unit tab (via A):', text, '-> Unit', currentUnitNumber);
+                                console.log('Found active unit tab (via A.active):', text, '-> Unit', currentUnitNumber);
                                 break;
+                            }
+                        }
+                    }
+
+                    // Method 3: Look for LI elements with active class (broader search)
+                    if (!currentUnitNumber) {
+                        const listItems = document.querySelectorAll('li.active, li.selected, li.current');
+                        for (const li of listItems) {
+                            const link = li.querySelector('a');
+                            if (link) {
+                                const text = link.textContent.trim();
+                                const match = text.match(/^Unit\s+(\d+)/i);  // Removed colon requirement
+                                if (match) {
+                                    currentUnitNumber = match[1];
+                                    console.log('Found active unit tab (via LI.active):', text, '-> Unit', currentUnitNumber);
+                                    break;
+                                }
                             }
                         }
                     }
 
                     console.log('Current unit number:', currentUnitNumber || 'Not detected');
+                    console.log('=== END DEBUG ===');
 
                     // Counter for sequential numbering of slides
                     let slideCounter = 0;
