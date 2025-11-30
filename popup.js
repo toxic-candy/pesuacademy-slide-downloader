@@ -352,7 +352,12 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (pdfCount > 1) {
                             const mergeUnitBtn = document.createElement('button');
                             mergeUnitBtn.className = 'btn-merge-unit';
-                            mergeUnitBtn.textContent = `🔗 Merge ${pdfCount} PDFs`;
+                            mergeUnitBtn.innerHTML = `
+                                <svg class="btn-icon" viewBox="0 0 32 32" fill="currentColor">
+                                    <path d="M20.293,27.707l-3.586,3.586c-0.391,0.391-1.024,0.391-1.414,0l-3.586-3.586 C11.077,27.077,11.523,26,12.414,26H13v-4.687c0-1.326-0.527-2.599-1.465-3.536l-5.314-5.313C4.159,10.403,3,7.606,3,4.69V1 c0-0.552,0.448-1,1-1h4c0.552,0,1,0.448,1,1v3.688c0,1.325,0.527,2.596,1.464,3.533l5.315,5.314 c0.078,0.078,0.146,0.164,0.221,0.244c0,0,0.001-0.001,0.001-0.001C17.919,15.815,19,18.504,19,21.31v0.004V26h0.586 C20.477,26,20.923,27.077,20.293,27.707z M28,0h-4c-0.552,0-1,0.448-1,1v3.686c0,1.326-0.527,2.598-1.465,3.536l-4.837,4.837 c1.53,1.612,2.565,3.571,3.024,5.702c0.21-0.352,0.448-0.688,0.743-0.983l5.313-5.313C27.841,10.402,29,7.605,29,4.688V1 C29,0.448,28.552,0,28,0z"/>
+                                </svg>
+                                Merge ${pdfCount} PDFs
+                            `;
                             mergeUnitBtn.onclick = () => mergeUnitPDFs(folderName);
                             slidesList.appendChild(mergeUnitBtn);
                         }
@@ -361,9 +366,20 @@ document.addEventListener('DOMContentLoaded', () => {
                             const slideItem = document.createElement('div');
                             slideItem.className = 'slide-item';
 
-                            const icon = document.createElement('span');
-                            icon.className = 'slide-icon';
-                            icon.textContent = slide.name.toLowerCase().endsWith('.pdf') ? '📄' : '📊';
+                            const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                            icon.setAttribute('class', 'slide-icon');
+                            icon.setAttribute('viewBox', '0 0 24 24');
+                            icon.setAttribute('fill', 'none');
+                            icon.setAttribute('stroke', 'currentColor');
+                            icon.setAttribute('stroke-width', '2');
+
+                            if (slide.name.toLowerCase().endsWith('.pdf')) {
+                                // PDF file icon
+                                icon.innerHTML = '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline>';
+                            } else {
+                                // Presentation file icon
+                                icon.innerHTML = '<rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line>';
+                            }
 
                             const name = document.createElement('span');
                             name.className = 'slide-name';
@@ -401,7 +417,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             if (response && response.success) {
-                status.textContent = `✅ Downloaded ${foundSlides.length} slide(s)!`;
+                status.innerHTML = `<svg style="width:14px;height:14px;vertical-align:text-bottom;margin-right:6px;display:inline-block;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="9 12 11 14 15 10"></polyline></svg>Downloaded ${foundSlides.length} slide(s)!`;
                 progressFill.style.width = '100%';
 
                 setTimeout(() => {
@@ -441,7 +457,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             if (response && response.success) {
-                status.textContent = `✅ ${folderName} PDFs merged successfully!`;
+                status.innerHTML = `<svg style="width:14px;height:14px;vertical-align:text-bottom;margin-right:6px;display:inline-block;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="9 12 11 14 15 10"></polyline></svg>${folderName} PDFs merged successfully!`;
                 progressFill.style.width = '100%';
 
                 setTimeout(() => {
