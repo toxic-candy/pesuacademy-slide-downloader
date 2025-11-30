@@ -30,8 +30,12 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://www.pesuacademy.com/Academy/*"],
-      "js": ["content.js"],
+      "matches": [
+        "https://www.pesuacademy.com/Academy/*"
+      ],
+      "js": [
+        "content.js"
+      ],
       "run_at": "document_idle"
     }
   ]

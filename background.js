@@ -1,6 +1,9 @@
-// Background service worker for handling downloads
+// Background service worker for handling downloads and PDF merging
 
 console.log('PESU Academy Slide Downloader background service worker loaded');
+
+// Import PDF-lib from local file
+importScripts('pdf-lib.min.js');
 
 // Listen for messages from popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -15,6 +18,16 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 sendResponse({ success: false, error: error.message });
             });
         return true; // Keep message channel open for async response
+    } else if (request.type === 'mergePDFs') {
+        handlePDFMerge(request.slides, request.outputName, sender.tab?.id)
+            .then(() => {
+                sendResponse({ success: true });
+            })
+            .catch(error => {
+                console.error('Merge error:', error);
+                sendResponse({ success: false, error: error.message });
+            });
+        return true;
     }
 });
 
@@ -24,13 +37,9 @@ async function handleBatchDownload(slides, courseName, tabId) {
 
     for (const slide of slides) {
         try {
-            // Sanitize filename to remove invalid characters
             const sanitizedName = sanitizeFilename(slide.name);
-
-            // Use the folderName from the slide object, or fall back to courseName
             const folderName = slide.folderName || courseName || 'Unknown_Course';
 
-            // Start download with unit-specific subfolder
             await new Promise((resolve, reject) => {
                 chrome.downloads.download({
                     url: slide.url,
@@ -45,15 +54,12 @@ async function handleBatchDownload(slides, courseName, tabId) {
                         console.log(`Download started: ${slide.name} (ID: ${downloadId})`);
                         downloadedCount++;
 
-                        // Send progress update to popup
                         if (tabId) {
                             chrome.tabs.sendMessage(tabId, {
                                 type: 'downloadProgress',
                                 downloaded: downloadedCount,
                                 total: total
-                            }).catch(() => {
-                                // Popup might be closed, ignore error
-                            });
+                            }).catch(() => { });
                         }
 
                         resolve(downloadId);
@@ -61,25 +67,110 @@ async function handleBatchDownload(slides, courseName, tabId) {
                 });
             });
 
-            // Small delay between downloads to avoid overwhelming the server
             await sleep(300);
 
         } catch (error) {
             console.error(`Error downloading ${slide.name}:`, error);
-            // Continue with next download even if one fails
         }
     }
 
     console.log(`Batch download complete: ${downloadedCount}/${total} files`);
 }
 
+async function handlePDFMerge(slides, outputName, tabId) {
+    console.log(`Starting PDF merge for ${slides.length} files`);
+
+    try {
+        // Create a new PDF document
+        const mergedPdf = await PDFLib.PDFDocument.create();
+        let processedCount = 0;
+
+        // Download and merge each PDF
+        for (const slide of slides) {
+            try {
+                console.log(`Fetching PDF: ${slide.name}`);
+
+                // Send progress update
+                if (tabId) {
+                    chrome.tabs.sendMessage(tabId, {
+                        type: 'mergeProgress',
+                        current: processedCount + 1,
+                        total: slides.length
+                    }).catch(() => { });
+                }
+
+                // Fetch the PDF file
+                const response = await fetch(slide.url);
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch ${slide.name}: ${response.status}`);
+                }
+
+                const pdfBytes = await response.arrayBuffer();
+
+                // Load the PDF
+                const pdf = await PDFLib.PDFDocument.load(pdfBytes);
+
+                // Copy all pages from this PDF to the merged PDF
+                const copiedPages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
+                copiedPages.forEach((page) => {
+                    mergedPdf.addPage(page);
+                });
+
+                console.log(`Added ${copiedPages.length} pages from ${slide.name}`);
+                processedCount++;
+
+            } catch (error) {
+                console.error(`Error processing ${slide.name}:`, error);
+                // Continue with other PDFs even if one fails
+            }
+        }
+
+        // Save the merged PDF
+        const mergedPdfBytes = await mergedPdf.save();
+
+        // Convert to base64 data URL (URL.createObjectURL not available in service workers)
+        // Process in chunks to avoid stack overflow on large files
+        const uint8Array = new Uint8Array(mergedPdfBytes);
+        const chunkSize = 0x8000; // 32KB chunks
+        let binaryString = '';
+
+        for (let i = 0; i < uint8Array.length; i += chunkSize) {
+            const chunk = uint8Array.subarray(i, Math.min(i + chunkSize, uint8Array.length));
+            binaryString += String.fromCharCode.apply(null, chunk);
+        }
+
+        const base64 = btoa(binaryString);
+        const dataUrl = `data:application/pdf;base64,${base64}`;
+
+        // Download the merged PDF
+        const sanitizedOutputName = sanitizeFilename(outputName);
+
+        chrome.downloads.download({
+            url: dataUrl,
+            filename: `PESU_Slides/${sanitizedOutputName}`,
+            conflictAction: 'uniquify',
+            saveAs: false
+        }, (downloadId) => {
+            if (chrome.runtime.lastError) {
+                console.error('Failed to download merged PDF:', chrome.runtime.lastError);
+            } else {
+                console.log(`Merged PDF downloaded successfully (ID: ${downloadId})`);
+            }
+        });
+
+        console.log(`Successfully merged ${processedCount} PDFs`);
+
+    } catch (error) {
+        console.error('Error in PDF merge process:', error);
+        throw error;
+    }
+}
+
 function sanitizeFilename(filename) {
-    // Remove or replace invalid filename characters
-    // Keep spaces, periods, and other safe characters
     return filename
-        .replace(/[<>:"/\\|?*]/g, '_')  // Replace invalid chars with underscore
-        .replace(/_+/g, '_')             // Replace multiple underscores with single
-        .substring(0, 200);              // Limit length
+        .replace(/[<>:"/\\|?*]/g, '_')
+        .replace(/_+/g, '_')
+        .substring(0, 200);
 }
 
 function sleep(ms) {
